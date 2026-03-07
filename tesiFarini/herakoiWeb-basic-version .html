@@ -188,37 +188,35 @@
             
             if (pixelX >= 0 && pixelX < overlayCanvas.width && pixelY >= 0 && pixelY < overlayCanvas.height) {
               const i = (pixelY * overlayCanvas.width + pixelX) * 4;
-              
-              // Leggiamo i valori RGB reali del pixel
-              const r = grayscaleData.data[i];
-              const g = grayscaleData.data[i + 1];
-              const b = grayscaleData.data[i + 2];
+              const hue = grayscaleData.data[i];
+              const sat = grayscaleData.data[i + 1];
+              const brightness = grayscaleData.data[i + 2];
 
-              // DEFINIZIONE DEI COLORI (Soglie di sicurezza)
-              const isRed    = r > 150 && g < 100 && b < 100; // Partenza
-              const isGreen = g > 100 && g > r && g > b;// Fine
-              const isBlack  = r < 60  && g < 60  && b < 60;  // Strada
-              const isWhite  = r > 200 && g > 200 && b > 200; // Fuori strada (Sfondo)
+              // DEFINIZIONE DEI COLORI
+              const isBlack = brightness < 60;                          // Strada 
+              const isWhite = brightness > 180 && sat < 60;  // Fuori percorso
+              const isRed = brightness > 70 && sat > 100 && (hue < 25 || hue > 230);  // Partenza 
+              const isGreen = brightness > 70 && sat > 100 && (hue > 60 && hue < 110); // Arrivo 
 
               let statusText = "";
-
+              
               if (isRed) {
-                  playFrequency(880, 0.3); // Suono acuto (Partenza)
+                  playFrequency(880, 0.3); // Suono partenza
                   statusText = "START";
               } else if (isGreen) {
-                  playFrequency(1200, 0.4); // Suono squillante (Arrivo)
+                  playFrequency(1200, 0.4); // Suono arrivo
                   statusText = "FINISH!";
               } else if (isBlack) {
-                  playFrequency(440, 0.2); // Nota media stabile (Sulla strada)
+                  playFrequency(440, 0.2); // Suono strada
                   statusText = "ROAD";
               } else if (isWhite) {
-                  playFrequency(150, 0.15); // Nota bassa e ruvida (Fuori strada)
+                  playFrequency(150, 0.15); // Suono fuori strada
                   statusText = "OUT";
               } else {
                   stopFrequency();
               }
 
-              // Disegna il rettangolino con lo stato invece degli Hz
+              // Disegna il rettangolino 
               if (statusText !== "") {
                   overlayCtx.fillStyle = 'white';
                   overlayCtx.fillRect(x + 10, y - 30, 80, 20);
@@ -253,8 +251,44 @@
           inputImage.onload = function() {
             imgCtx.drawImage(inputImage, 0, 0, imgCanvas.width, imgCanvas.height);
             
-            // Carica i dati dell'immagine così come sono (RGB originali)
+            // Create grayscale version for sonification
             grayscaleData = imgCtx.getImageData(0, 0, imgCanvas.width, imgCanvas.height);
+            const data = grayscaleData.data;
+            
+            // Convert to HSV for sonification accuracy
+            for (let i = 0; i < data.length; i += 4) {
+              const r = data[i] / 255;
+              const g = data[i + 1] / 255;
+              const b = data[i + 2] / 255;
+
+              const cmax = Math.max(r, g, b);
+              const cmin = Math.min(r, g, b);
+              const delta = cmax - cmin;
+
+              let h = 0;
+              if (delta !== 0) {
+                if (cmax === r) {
+                  h = 60 * (((g - b) / delta) % 6);
+                } else if (cmax === g) {
+                  h = 60 * ((b - r) / delta + 2);
+                } else {
+                  h = 60 * ((r - g) / delta + 4);
+                }
+              }
+              if (h < 0) h += 360;
+
+              const v = cmax;
+              const s = (cmax === 0) ? 0 : delta / cmax; //aggiunto saturazione perchè non riconosceva rosso e bianco
+              
+              const hByte = Math.round((h / 360) * 255);
+              const vByte = Math.round(v * 255);
+              const sByte = Math.round(s * 255); //saturazione in 0-255
+
+              // Store hue and value into separate channels (e.g., red = hue, green = value)
+              data[i]     = hByte;   // Red channel holds hue
+              data[i + 1] = sByte;   // Grenn channel holds hue CAMBIATO
+              data[i + 2] = vByte;   // Blue channel holds value
+            }
           };
           inputImage.src = event.target.result;
         };
