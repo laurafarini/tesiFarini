@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MediaPipe JS + Image Sonification (Mirrored)</title>
+  <title>MediaPipe JS + Geometric Sonification (Mani Originali)</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
@@ -9,32 +9,43 @@
     body { margin: 0; background: black; font-family: sans-serif; display: flex; flex-direction: row; justify-content: center; align-items: flex-start; gap: 20px; padding: 20px; }
     #container { display: flex; flex-direction: row; gap: 20px; }
     .panel { position: relative; width: 640px; height: 480px; }
-    canvas, video, img { position: absolute; top: 0; left: 0; width: 640px; height: 480px; }
-    video { transform: scaleX(-1); } /* Mirror the video */
-    #output_canvas { transform: scaleX(-1); } /* Mirror the output canvas */
-    #upload { position: absolute; top: 10px; left: 10px; z-index: 3; background: white; padding: 6px; border-radius: 5px; }
+    canvas, video { position: absolute; top: 0; left: 0; width: 640px; height: 480px; }
+    video { transform: scaleX(-1); } 
+    #output_canvas { transform: scaleX(-1); } 
+    
     .controls { position: absolute; top: 10px; right: 10px; z-index: 3; background: rgba(255,255,255,0.7); padding: 10px; border-radius: 5px; }
+    
+    #btnNext {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      z-index: 10;
+      padding: 12px 20px;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    #btnNext:active { transform: translateY(2px); }
   </style>
 </head>
 <body>
-  <input type="file" id="upload" accept="image/*">
   <div id="container">
     <div class="panel">
       <canvas id="imageCanvas"></canvas>
       <canvas id="imageOverlay" style="z-index:2;"></canvas>
-      <img id="inputImage" crossorigin="anonymous">
+      <button id="btnNext">PROSSIMO LIVELLO ➔</button>
       <div class="controls">
-        <label for="frequency-range">Frequency Range:</label>
-        <input type="range" id="min-freq" min="100" max="500" value="200" step="10">
-        <span id="min-freq-value">200</span> Hz
-        <input type="range" id="max-freq" min="500" max="2000" value="700" step="10">
-        <span id="max-freq-value">700</span> Hz
+        <label>Frequency Range:</label><br>
+        <input type="range" id="min-freq" min="100" max="500" value="200" step="10"> <span id="min-freq-value">200</span> Hz<br>
+        <input type="range" id="max-freq" min="500" max="2000" value="700" step="10"> <span id="max-freq-value">700</span> Hz
         <br><br>
-        <label for="volume-range">Volume Range:</label>
-        <input type="range" id="min-vol" min="0.00" max="0.30" value="0.00" step="0.01">
-        <span id="min-vol-value">0.00</span>
-        <input type="range" id="max-vol" min="0.30" max="1.00" value="0.30" step="0.01">
-        <span id="max-vol-value">1.00</span>
+        <label>Volume Range:</label><br>
+        <input type="range" id="min-vol" min="0.00" max="0.30" value="0.00" step="0.01"> <span id="min-vol-value">0.00</span><br>
+        <input type="range" id="max-vol" min="0.30" max="1.00" value="0.30" step="0.01"> <span id="max-vol-value">1.00</span>
       </div>
     </div>
     <div class="panel">
@@ -51,265 +62,181 @@
     const imgCtx = imgCanvas.getContext('2d');
     const overlayCanvas = document.getElementById('imageOverlay');
     const overlayCtx = overlayCanvas.getContext('2d');
-    const inputImage = document.getElementById('inputImage');
     
+    // Sliders
     const minFreqSlider = document.getElementById('min-freq');
     const maxFreqSlider = document.getElementById('max-freq');
     const minFreqValue = document.getElementById('min-freq-value');
     const maxFreqValue = document.getElementById('max-freq-value');
-
     const minVolSlider = document.getElementById('min-vol');
     const maxVolSlider = document.getElementById('max-vol');
     const minVolValue = document.getElementById('min-vol-value');
     const maxVolValue = document.getElementById('max-vol-value');
 
-    let grayscaleData = null;
+    let minFreq = 200, maxFreq = 700, minVol = 0.00, maxVol = 0.30;
 
-    let minFreq = 200;
-    let maxFreq = 700;
-
-    // Update frequency range values
-    minFreqSlider.addEventListener('input', function() {
-      minFreq = parseInt(this.value);
-      minFreqValue.textContent = minFreq;
-    });
-
-    maxFreqSlider.addEventListener('input', function() {
-      maxFreq = parseInt(this.value);
-      maxFreqValue.textContent = maxFreq;
-    });
-
-    let minVol = 0.00;
-    let maxVol = 0.30;
-
-    // Update volume range values
-    minVolSlider.addEventListener('input', function() {
-      minVol = parseFloat(this.value);
-      minVolValue.textContent = minVol;
-    });
-
-    maxVolSlider.addEventListener('input', function() {
-      maxVol = parseFloat(this.value);
-      maxVolValue.textContent = maxVol;
-    });
-  
-    const hands = new Hands({
-      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
-    });
-
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7
-    });
+    minFreqSlider.addEventListener('input', function() { minFreq = parseInt(this.value); minFreqValue.textContent = minFreq; });
+    maxFreqSlider.addEventListener('input', function() { maxFreq = parseInt(this.value); maxFreqValue.textContent = maxFreq; });
+    minVolSlider.addEventListener('input', function() { minVol = parseFloat(this.value); minVolValue.textContent = minVol.toFixed(2); });
+    maxVolSlider.addEventListener('input', function() { maxVol = parseFloat(this.value); maxVolValue.textContent = maxVol.toFixed(2); });
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    let oscillator = null;
-    let gainNode = null;
+    let oscillator = null, gainNode = null, grayscaleData = null;
+
+    const lineWidthNera = 60, lineWidthColori = 64, colorBlockLength = 60;
+
+    const levels = [
+      function l1() {
+        fillRect("white", 0, 0, 640, 480);
+        const p1 = [50, 240], p2 = [590, 240];
+        drawTrace("black", lineWidthNera, [p1, p2]);
+        fillRect("red", p1[0] - colorBlockLength, p1[1] - lineWidthColori/2, colorBlockLength, lineWidthColori);
+        fillRect("green", p2[0], p2[1] - lineWidthColori/2, colorBlockLength, lineWidthColori);
+      },
+      function l2() {
+        fillRect("white", 0, 0, 640, 480);
+        const pStart = [50, 240], pEnd = [590, 240];
+        drawTrace("black", lineWidthNera, [pStart, [200, 240], [200, 100], [440, 100], [440, 240], pEnd]);
+        fillRect("red", pStart[0] - colorBlockLength, pStart[1] - lineWidthColori/2, colorBlockLength, lineWidthColori);
+        fillRect("green", pEnd[0], pEnd[1] - lineWidthColori/2, colorBlockLength, lineWidthColori);
+      },
+      function l3() {
+        fillRect("white", 0, 0, 640, 480);
+        const pStart = [50, 380], pEnd = [590, 260];
+        drawTrace("black", 50, [pStart, [180, 380], [180, 260], [310, 260], [310, 140], [440, 140], [440, 260], pEnd]);
+        fillRect("red", pStart[0] - colorBlockLength, pStart[1] - 54/2, colorBlockLength, 54);
+        fillRect("green", pEnd[0], pEnd[1] - 54/2, colorBlockLength, 54);
+      },
+      function l4() {
+        fillRect("white", 0, 0, 640, 480);
+        const pStart = [50, 240], pEnd = [590, 240];
+        drawTrace("black", 40, [pStart, [150, 240], [150, 100], [250, 100], [250, 240], [390, 240], [390, 100], [490, 100], [490, 240], pEnd]);
+        fillRect("red", pStart[0] - colorBlockLength, pStart[1] - 44/2, colorBlockLength, 44);
+        fillRect("green", pEnd[0], pEnd[1] - 44/2, colorBlockLength, 44);
+      },
+      function l5() {
+        fillRect("white", 0, 0, 640, 480);
+        const pStart = [100, 100], pEnd = [540, 380];
+        drawTrace("black", 30, [pStart, [540, 100], [540, 240], [220, 240], [220, 380], pEnd]);
+        fillRect("red", pStart[0] - colorBlockLength, pStart[1] - 34/2, colorBlockLength, 34);
+        fillRect("green", pEnd[0], pEnd[1] - 34/2, colorBlockLength, 34);
+      }
+    ];
+
+    function fillRect(color, x, y, w, h) { imgCtx.fillStyle = color; imgCtx.fillRect(x, y, w, h); }
+    function drawTrace(color, lineWidth, points) {
+      if (points.length < 2) return;
+      imgCtx.strokeStyle = color; imgCtx.lineWidth = lineWidth;
+      imgCtx.lineCap = "square"; imgCtx.lineJoin = "miter";
+      imgCtx.beginPath(); imgCtx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) imgCtx.lineTo(points[i][0], points[i][1]);
+      imgCtx.stroke();
+    }
+
+    let currentLevel = 0;
+    function loadLevel(index) {
+      currentLevel = index;
+      imgCtx.clearRect(0, 0, 640, 480);
+      levels[currentLevel]();
+      grayscaleData = imgCtx.getImageData(0, 0, 640, 480);
+      const data = grayscaleData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]/255, g = data[i+1]/255, b = data[i+2]/255;
+        const cmax = Math.max(r, g, b), delta = cmax - Math.min(r, g, b);
+        let h = 0;
+        if (delta !== 0) {
+          if (cmax === r) h = 60 * (((g - b) / delta) % 6);
+          else if (cmax === g) h = 60 * ((b - r) / delta + 2);
+          else h = 60 * ((r - g) / delta + 4);
+        }
+        if (h < 0) h += 360;
+        data[i] = Math.round((h/360)*255);
+        data[i+1] = Math.round(((cmax === 0) ? 0 : delta/cmax)*255);
+        data[i+2] = Math.round(cmax*255);
+      }
+      document.getElementById('btnNext').innerText = `PROSSIMO LIVELLO (${currentLevel + 1}/${levels.length}) ➔`;
+    }
 
     function playFrequency(freq, volume = 0.5) {
       if (!oscillator) {
         oscillator = audioCtx.createOscillator();
         gainNode = audioCtx.createGain();
-        
         oscillator.type = 'sine';
         oscillator.connect(gainNode);
         gainNode.connect(audioCtx.destination);
-        
         oscillator.start();
       }
-      
       gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
       oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
     }
 
     function stopFrequency() {
       if (oscillator) {
-        gainNode.gain.setValueAtTime(gainNode.gain.value, audioCtx.currentTime);
         gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-        
-        setTimeout(() => {
-          oscillator.stop();
-          oscillator.disconnect();
-          gainNode.disconnect();
-          oscillator = null;
-          gainNode = null;
-        }, 100);
+        setTimeout(() => { if(oscillator){oscillator.stop(); oscillator.disconnect(); oscillator = null; gainNode = null;} }, 100);
       }
     }
 
-    hands.onResults(results => {
-      // Webcam canvas - note we're not mirroring in the drawing code since the CSS handles it
-      canvasCtx.save();
-      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+    const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
 
-      // Image canvas and overlay
-      imgCtx.clearRect(0, 0, imgCanvas.width, imgCanvas.height);
-      imgCtx.drawImage(inputImage, 0, 0, imgCanvas.width, imgCanvas.height);
-      overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    hands.onResults(results => {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, 640, 480);
+      canvasCtx.drawImage(results.image, 0, 0, 640, 480);
+      overlayCtx.clearRect(0, 0, 640, 480);
 
       let handDetected = false;
-
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
         handDetected = true;
         for (const handLms of results.multiHandLandmarks) {
-          // Draw hand landmarks on webcam view
           drawConnectors(canvasCtx, handLms, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
           drawLandmarks(canvasCtx, handLms, {color: '#FF0000', lineWidth: 1});
           
-          // Draw hand landmarks on image overlay
-          // For the image overlay, we need to mirror the x-coordinate to match hand movement
-          const mirroredHandLms = handLms.map(landmark => {
-            return {
-              x: 1 - landmark.x, // Mirror the x coordinate
-              y: landmark.y,
-              z: landmark.z
-            };
-          });
-          
+          const mirroredHandLms = handLms.map(l => ({ x: 1 - l.x, y: l.y, z: l.z }));
           drawConnectors(overlayCtx, mirroredHandLms, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
           drawLandmarks(overlayCtx, mirroredHandLms, {color: '#FF0000', lineWidth: 1});
 
-          // Use index finger tip (landmark 8) for sonification
-          const x = mirroredHandLms[8].x * overlayCanvas.width;
-          const y = mirroredHandLms[8].y * overlayCanvas.height;
-          const boxSize = 20;
-          
-          // Draw targeting box
-          overlayCtx.strokeStyle = 'lime';
-          overlayCtx.lineWidth = 2;
-          overlayCtx.strokeRect(x - boxSize/2, y - boxSize/2, boxSize, boxSize);
+          const x = mirroredHandLms[8].x * 640, y = mirroredHandLms[8].y * 480;
+          overlayCtx.strokeStyle = 'lime'; overlayCtx.lineWidth = 2;
+          overlayCtx.strokeRect(x - 10, y - 10, 20, 20);
 
           if (grayscaleData) {
-            const pixelX = Math.floor(x);
-            const pixelY = Math.floor(y);
-            
-            if (pixelX >= 0 && pixelX < overlayCanvas.width && pixelY >= 0 && pixelY < overlayCanvas.height) {
-              const i = (pixelY * overlayCanvas.width + pixelX) * 4;
-              const hue = grayscaleData.data[i];
-              const sat = grayscaleData.data[i + 1];
-              const brightness = grayscaleData.data[i + 2];
+            const px = Math.floor(x), py = Math.floor(y);
+            if (px >= 0 && px < 640 && py >= 0 && py < 480) {
+              const i = (py * 640 + px) * 4;
+              const h = grayscaleData.data[i], s = grayscaleData.data[i+1], v = grayscaleData.data[i+2];
 
-              // DEFINIZIONE DEI COLORI
-              const isBlack = brightness < 60;                          // Strada 
-              const isWhite = brightness > 180 && sat < 60;  // Fuori percorso
-              const isRed = brightness > 70 && sat > 100 && (hue < 25 || hue > 230);  // Partenza 
-              const isGreen = brightness > 70 && sat > 100 && (hue > 60 && hue < 110); // Arrivo 
+              const isBlack = v < 60;
+              const isWhite = v > 180 && s < 60;
+              const isRed = v > 70 && s > 100 && (h < 25 || h > 230);
+              const isGreen = v > 70 && s > 100 && (h > 60 && h < 110);
 
               let statusText = "";
-              
-              if (isRed) {
-                  playFrequency(880, 0.3); // Suono partenza
-                  statusText = "START";
-              } else if (isGreen) {
-                  playFrequency(1200, 0.4); // Suono arrivo
-                  statusText = "FINISH!";
-              } else if (isBlack) {
-                  playFrequency(440, 0.2); // Suono strada
-                  statusText = "ROAD";
-              } else if (isWhite) {
-                  playFrequency(150, 0.15); // Suono fuori strada
-                  statusText = "OUT";
-              } else {
-                  stopFrequency();
-              }
+              if (isRed) { playFrequency(880, 0.3); statusText = "START"; }
+              else if (isGreen) { playFrequency(1200, 0.4); statusText = "FINISH!"; }
+              else if (isBlack) { playFrequency(440, 0.2); statusText = "ROAD"; }
+              else if (isWhite) { playFrequency(150, 0.15); statusText = "OUT"; }
+              else { stopFrequency(); }
 
-              // Disegna il rettangolino 
               if (statusText !== "") {
-                  overlayCtx.fillStyle = 'white';
-                  overlayCtx.fillRect(x + 10, y - 30, 80, 20);
-                  overlayCtx.fillStyle = 'black';
-                  overlayCtx.font = 'bold 12px sans-serif';
-                  overlayCtx.fillText(statusText, x + 15, y - 15);
+                overlayCtx.fillStyle = 'white'; overlayCtx.fillRect(x + 10, y - 30, 80, 20);
+                overlayCtx.fillStyle = 'black'; overlayCtx.font = 'bold 12px sans-serif';
+                overlayCtx.fillText(statusText, x + 15, y - 15);
               }
             }
           }
         }
       }
-
       if (!handDetected) stopFrequency();
-
       canvasCtx.restore();
     });
 
-    const camera = new Camera(videoElement, {
-      onFrame: async () => {
-        await hands.send({image: videoElement});
-      },
-      width: 640,
-      height: 480
-    });
+    const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 640, height: 480 });
+    document.getElementById('btnNext').addEventListener('click', () => { loadLevel((currentLevel + 1) % levels.length); });
+    [canvasElement, imgCanvas, overlayCanvas].forEach(c => { c.width = 640; c.height = 480; });
     camera.start();
-
-    document.getElementById('upload').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-          inputImage.onload = function() {
-            imgCtx.drawImage(inputImage, 0, 0, imgCanvas.width, imgCanvas.height);
-            
-            // Create grayscale version for sonification
-            grayscaleData = imgCtx.getImageData(0, 0, imgCanvas.width, imgCanvas.height);
-            const data = grayscaleData.data;
-            
-            // Convert to HSV for sonification accuracy
-            for (let i = 0; i < data.length; i += 4) {
-              const r = data[i] / 255;
-              const g = data[i + 1] / 255;
-              const b = data[i + 2] / 255;
-
-              const cmax = Math.max(r, g, b);
-              const cmin = Math.min(r, g, b);
-              const delta = cmax - cmin;
-
-              let h = 0;
-              if (delta !== 0) {
-                if (cmax === r) {
-                  h = 60 * (((g - b) / delta) % 6);
-                } else if (cmax === g) {
-                  h = 60 * ((b - r) / delta + 2);
-                } else {
-                  h = 60 * ((r - g) / delta + 4);
-                }
-              }
-              if (h < 0) h += 360;
-
-              const v = cmax;
-              const s = (cmax === 0) ? 0 : delta / cmax; //aggiunto saturazione perchè non riconosceva rosso e bianco
-              
-              const hByte = Math.round((h / 360) * 255);
-              const vByte = Math.round(v * 255);
-              const sByte = Math.round(s * 255); //saturazione in 0-255
-
-              // Store hue and value into separate channels (e.g., red = hue, green = value)
-              data[i]     = hByte;   // Red channel holds hue
-              data[i + 1] = sByte;   // Grenn channel holds hue CAMBIATO
-              data[i + 2] = vByte;   // Blue channel holds value
-            }
-          };
-          inputImage.src = event.target.result;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    // Initial setup - ensure canvas sizes match
-    function setupCanvasSizes() {
-      const width = 640;
-      const height = 480;
-      
-      [canvasElement, imgCanvas, overlayCanvas].forEach(canvas => {
-        canvas.width = width;
-        canvas.height = height;
-      });
-    }
-    
-    setupCanvasSizes();
-    
-    // Handle window resize
+    loadLevel(0);
     window.addEventListener('resize', setupCanvasSizes);
   </script>
 </body>
