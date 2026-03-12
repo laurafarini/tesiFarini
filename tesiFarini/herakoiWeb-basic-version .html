@@ -1,60 +1,86 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MediaPipe JS + Geometric Sonification (Mani Originali)</title>
+  <title>Livelli uditivi - Pro</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <style>
-    body { margin: 0; background: black; font-family: sans-serif; display: flex; flex-direction: row; justify-content: center; align-items: flex-start; gap: 20px; padding: 20px; }
-    #container { display: flex; flex-direction: row; gap: 20px; }
-    .panel { position: relative; width: 640px; height: 480px; }
-    canvas, video { position: absolute; top: 0; left: 0; width: 640px; height: 480px; }
+    :root {
+      --bg: #0f172a;
+      --accent: #38bdf8;
+    }
+    body { 
+      margin: 0; background: var(--bg); font-family: 'Segoe UI', sans-serif; 
+      display: flex; flex-direction: column; align-items: center; padding: 20px; color: white;
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    #container { display: flex; flex-direction: row; gap: 20px; background: #1e293b; padding: 15px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    
+    .panel { position: relative; width: 640px; height: 480px; border-radius: 10px; overflow: hidden; border: 2px solid #334155; }
+    
+    /* Cruciale: dimensioni fisse per evitare zoom */
+    canvas, video { position: absolute; top: 0; left: 0; width: 640px !important; height: 480px !important; }
+    
     video { transform: scaleX(-1); } 
     #output_canvas { transform: scaleX(-1); } 
     
-    .controls { position: absolute; top: 10px; right: 10px; z-index: 3; background: rgba(255,255,255,0.7); padding: 10px; border-radius: 5px; }
+    .controls { 
+      position: absolute; top: 10px; right: 10px; z-index: 3; 
+      background: rgba(15, 23, 42, 0.9); padding: 12px; border-radius: 10px; 
+      font-size: 12px; border: 1px solid var(--accent);
+    }
     
     #btnNext {
-      position: absolute;
-      bottom: 10px;
-      left: 10px;
-      z-index: 10;
-      padding: 12px 20px;
-      cursor: pointer;
-      background-color: #4CAF50;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-weight: bold;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+      position: absolute; bottom: 15px; left: 15px; z-index: 10;
+      padding: 12px 24px; cursor: pointer; background: var(--accent);
+      color: #0f172a; border: none; border-radius: 50px; font-weight: bold;
+      transition: transform 0.2s;
     }
-    #btnNext:active { transform: translateY(2px); }
+    #btnNext:hover { transform: scale(1.05); }
+
+    .instructions {
+      margin-top: 20px; width: 100%; max-width: 1300px;
+      padding: 15px; background: rgba(56, 189, 248, 0.1); border-radius: 10px; border-left: 4px solid var(--accent);
+    }
   </style>
 </head>
 <body>
+
+  <div class="header">
+    <h1>LIVELLI UDITIVI</h1>
+    <p>Segui il Percorso del Suono</p>
+  </div>
+
   <div id="container">
     <div class="panel">
-      <canvas id="imageCanvas"></canvas>
-      <canvas id="imageOverlay" style="z-index:2;"></canvas>
+      <canvas id="imageCanvas" width="640" height="480"></canvas>
+      <canvas id="imageOverlay" width="640" height="480" style="z-index:2;"></canvas>
       <button id="btnNext">PROSSIMO LIVELLO ➔</button>
       <div class="controls">
-        <label>Frequency Range:</label><br>
-        <input type="range" id="min-freq" min="100" max="500" value="200" step="10"> <span id="min-freq-value">200</span> Hz<br>
-        <input type="range" id="max-freq" min="500" max="2000" value="700" step="10"> <span id="max-freq-value">700</span> Hz
+        <strong>IMPOSTAZIONI</strong><br><br>
+        Freq: <span id="min-freq-value">200</span> - <span id="max-freq-value">700</span> Hz<br>
+        <input type="range" id="min-freq" min="100" max="500" value="200">
+        <input type="range" id="max-freq" min="500" max="2000" value="700">
         <br><br>
-        <label>Volume Range:</label><br>
-        <input type="range" id="min-vol" min="0.00" max="0.30" value="0.00" step="0.01"> <span id="min-vol-value">0.00</span><br>
-        <input type="range" id="max-vol" min="0.30" max="1.00" value="0.30" step="0.01"> <span id="max-vol-value">1.00</span>
+        Vol: <span id="min-vol-value">0.00</span> - <span id="max-vol-value">0.30</span><br>
+        <input type="range" id="min-vol" min="0.00" max="0.30" value="0.00" step="0.01">
+        <input type="range" id="max-vol" min="0.30" max="1.00" value="0.30" step="0.01">
       </div>
     </div>
     <div class="panel">
-      <video id="input_video" playsinline muted autoplay></video>
-      <canvas id="output_canvas"></canvas>
+      <video id="input_video" width="640" height="480" playsinline muted autoplay></video>
+      <canvas id="output_canvas" width="640" height="480"></canvas>
     </div>
   </div>
 
+  <div class="instructions">
+    <strong>Note di utilizzo:</strong> Muovi la mano davanti alla fotocamera. La punta dell'indice (punto 8) funge da cursore. 
+    Il suono cambia in base al colore toccato: <span style="color:#ff4444">ROSSO (Start)</span>, <span style="color:#44ff44">VERDE (Finish)</span>, <strong>NERO (Tracciato)</strong>.
+  </div>
+
   <script>
+    // --- SETUP ELEMENTI ---
     const videoElement = document.getElementById('input_video');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
@@ -75,14 +101,35 @@
 
     let minFreq = 200, maxFreq = 700, minVol = 0.00, maxVol = 0.30;
 
-    minFreqSlider.addEventListener('input', function() { minFreq = parseInt(this.value); minFreqValue.textContent = minFreq; });
-    maxFreqSlider.addEventListener('input', function() { maxFreq = parseInt(this.value); maxFreqValue.textContent = maxFreq; });
-    minVolSlider.addEventListener('input', function() { minVol = parseFloat(this.value); minVolValue.textContent = minVol.toFixed(2); });
-    maxVolSlider.addEventListener('input', function() { maxVol = parseFloat(this.value); maxVolValue.textContent = maxVol.toFixed(2); });
+    minFreqSlider.oninput = function() { minFreq = parseInt(this.value); minFreqValue.textContent = minFreq; };
+    maxFreqSlider.oninput = function() { maxFreq = parseInt(this.value); maxFreqValue.textContent = maxFreq; };
+    minVolSlider.oninput = function() { minVol = parseFloat(this.value); minVolValue.textContent = minVol.toFixed(2); };
+    maxVolSlider.oninput = function() { maxVol = parseFloat(this.value); maxVolValue.textContent = maxVol.toFixed(2); };
 
+    // --- AUDIO AVANZATO (ADSR SOFT) ---
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     let oscillator = null, gainNode = null, grayscaleData = null;
 
+    function playFrequency(freq, volume = 0.5) {
+      if (!oscillator) {
+        oscillator = audioCtx.createOscillator();
+        gainNode = audioCtx.createGain();
+        oscillator.type = 'triangle'; // Suono più morbido della sine
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+        gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      }
+      // Transizioni dolci per evitare i click
+      oscillator.frequency.setTargetAtTime(freq, audioCtx.currentTime, 0.05);
+      gainNode.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.05);
+    }
+
+    function stopFrequency() {
+      if (gainNode) gainNode.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+    }
+
+    // --- LOGICA LIVELLI ORIGINALE ---
     const lineWidthNera = 60, lineWidthColori = 64, colorBlockLength = 60;
 
     const levels = [
@@ -138,7 +185,9 @@
       currentLevel = index;
       imgCtx.clearRect(0, 0, 640, 480);
       levels[currentLevel]();
-      grayscaleData = imgCtx.getImageData(0, 0, 640, 480);
+      const rawData = imgCtx.getImageData(0, 0, 640, 480);
+      grayscaleData = new ImageData(new Uint8ClampedArray(rawData.data), 640, 480);
+      
       const data = grayscaleData.data;
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i]/255, g = data[i+1]/255, b = data[i+2]/255;
@@ -154,29 +203,10 @@
         data[i+1] = Math.round(((cmax === 0) ? 0 : delta/cmax)*255);
         data[i+2] = Math.round(cmax*255);
       }
-      document.getElementById('btnNext').innerText = `PROSSIMO LIVELLO (${currentLevel + 1}/${levels.length}) ➔`;
+      document.getElementById('btnNext').innerText = `LIVELLO ${currentLevel + 1}/${levels.length} ➔`;
     }
 
-    function playFrequency(freq, volume = 0.5) {
-      if (!oscillator) {
-        oscillator = audioCtx.createOscillator();
-        gainNode = audioCtx.createGain();
-        oscillator.type = 'sine';
-        oscillator.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        oscillator.start();
-      }
-      gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
-      oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
-    }
-
-    function stopFrequency() {
-      if (oscillator) {
-        gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-        setTimeout(() => { if(oscillator){oscillator.stop(); oscillator.disconnect(); oscillator = null; gainNode = null;} }, 100);
-      }
-    }
-
+    // --- MEDIAPIPE ---
     const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
     hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
 
@@ -194,11 +224,11 @@
           drawLandmarks(canvasCtx, handLms, {color: '#FF0000', lineWidth: 1});
           
           const mirroredHandLms = handLms.map(l => ({ x: 1 - l.x, y: l.y, z: l.z }));
-          drawConnectors(overlayCtx, mirroredHandLms, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 2});
+          drawConnectors(overlayCtx, mirroredHandLms, HAND_CONNECTIONS, {color: '#38bdf8', lineWidth: 2});
           drawLandmarks(overlayCtx, mirroredHandLms, {color: '#FF0000', lineWidth: 1});
 
           const x = mirroredHandLms[8].x * 640, y = mirroredHandLms[8].y * 480;
-          overlayCtx.strokeStyle = 'lime'; overlayCtx.lineWidth = 2;
+          overlayCtx.strokeStyle = 'cyan'; overlayCtx.lineWidth = 2;
           overlayCtx.strokeRect(x - 10, y - 10, 20, 20);
 
           if (grayscaleData) {
@@ -216,13 +246,13 @@
               if (isRed) { playFrequency(880, 0.3); statusText = "START"; }
               else if (isGreen) { playFrequency(1200, 0.4); statusText = "FINISH!"; }
               else if (isBlack) { playFrequency(440, 0.2); statusText = "ROAD"; }
-              else if (isWhite) { playFrequency(150, 0.15); statusText = "OUT"; }
+              else if (isWhite) { playFrequency(150, 0.1); statusText = "OUT"; }
               else { stopFrequency(); }
 
               if (statusText !== "") {
-                overlayCtx.fillStyle = 'white'; overlayCtx.fillRect(x + 10, y - 30, 80, 20);
-                overlayCtx.fillStyle = 'black'; overlayCtx.font = 'bold 12px sans-serif';
-                overlayCtx.fillText(statusText, x + 15, y - 15);
+                overlayCtx.fillStyle = 'rgba(255,255,255,0.8)'; overlayCtx.fillRect(x + 15, y - 30, 60, 20);
+                overlayCtx.fillStyle = 'black'; overlayCtx.font = 'bold 10px sans-serif';
+                overlayCtx.fillText(statusText, x + 20, y - 16);
               }
             }
           }
@@ -233,11 +263,9 @@
     });
 
     const camera = new Camera(videoElement, { onFrame: async () => { await hands.send({image: videoElement}); }, width: 640, height: 480 });
-    document.getElementById('btnNext').addEventListener('click', () => { loadLevel((currentLevel + 1) % levels.length); });
-    [canvasElement, imgCanvas, overlayCanvas].forEach(c => { c.width = 640; c.height = 480; });
+    document.getElementById('btnNext').onclick = () => { loadLevel((currentLevel + 1) % levels.length); };
     camera.start();
     loadLevel(0);
-    window.addEventListener('resize', setupCanvasSizes);
   </script>
 </body>
 </html>
